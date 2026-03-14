@@ -9,6 +9,7 @@ Open-source examples for turning any screenshot into structured UI elements, exa
 ## What is inside
 
 - `browser_agent.ts` — Playwright loop that screenshots a browser, asks BeakVision what to do next, and executes the returned action.
+- `mac_desktop_agent.ts` — native macOS desktop loop using `screencapture` + BeakVision + `cliclick`.
 - `mobile_test.py` — Appium-driven mobile test that converts each device screenshot into the next tap, scroll, type, or drag.
 - `qa_automation/` — smoke-test and regression-watchdog examples for QA teams.
 - `integrations/langgraph/` — LangGraph state machine that treats BeakVision as the UI planner node.
@@ -40,6 +41,7 @@ BEAKVISION_PARSE_URL=https://your-beakvision-host/v1/parse
 BEAKVISION_API_KEY=your_api_key
 TARGET_URL=https://example.com
 BEAKVISION_GOAL=Log into the app and open the billing settings page.
+BEAKVISION_SUCCESS_URL_CONTAINS=#billing
 ```
 
 ## Example 1: Browser agent
@@ -52,9 +54,17 @@ The Playwright loop:
 
 1. Opens a browser page.
 2. Captures a screenshot.
-3. Sends the screenshot to BeakVision in `computer` mode.
+3. Sends the screenshot plus task state, action history, and completion criteria to BeakVision in `computer` mode.
 4. Reads back `thought`, `suggested_actions`, and exact coordinates.
 5. Executes the returned click, type, scroll, drag, or hotkey.
+6. Stops when the success condition is met or the model marks the task `finished`.
+
+Useful browser-agent env vars:
+
+- `BEAKVISION_SUCCESS_URL_CONTAINS` lets the runner stop when the URL reaches a known fragment or path.
+- `BEAKVISION_SUCCESS_TEXT_CONTAINS` lets the runner stop when specific visible text appears.
+- `BEAKVISION_SUCCESS_SELECTOR` lets the runner stop when a CSS selector exists.
+- `BEAKVISION_MAX_STEPS` caps the loop.
 
 ## Example 2: Mobile test
 
@@ -64,7 +74,31 @@ python mobile_test.py
 
 This example uses Appium plus BeakVision `mobile` mode to drive Android UI flows from screenshots instead of brittle selector-only scripts.
 
-## Example 3: QA automation
+## Example 3: macOS desktop control
+
+Install the click helper once:
+
+```bash
+brew install cliclick
+```
+
+Then run:
+
+```bash
+MACOS_APP_NAME=Calculator \
+BEAKVISION_GOAL="Click the 7 button in Calculator." \
+npm run mac-agent
+```
+
+Notes:
+
+- This example captures the live macOS desktop with `screencapture`.
+- It scales BeakVision pixel coordinates into macOS desktop coordinates before executing them with `cliclick`.
+- macOS Accessibility permission is required for real clicks and typing.
+- macOS Screen Recording permission is required so the script can capture the desktop screenshot it sends to BeakVision.
+- Set `MACOS_DRY_RUN=true` if you want to print the planned desktop actions without executing them.
+
+## Example 4: QA automation
 
 ```bash
 npm run qa:smoke
@@ -91,12 +125,16 @@ pip install -r requirements-crewai.txt
 python integrations/crewai/crew_agent.py
 ```
 
+Without `OPENAI_API_KEY`, this script falls back to a BeakVision tool smoke test so you can verify the integration wiring locally.
+
 ### AutoGen
 
 ```bash
 pip install -r requirements-autogen.txt
 python integrations/autogen/ui_delegate.py
 ```
+
+Without `OPENAI_API_KEY`, this script falls back to a BeakVision tool smoke test so you can verify the integration wiring locally.
 
 ## Raw API shape
 

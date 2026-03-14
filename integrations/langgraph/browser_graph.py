@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import base64
 import os
+import sys
+from pathlib import Path
 from typing import TypedDict
 
 from dotenv import load_dotenv
 from langgraph.graph import END, StateGraph
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from lib.beakvision import parse_screenshot
 
@@ -16,6 +20,7 @@ class BrowserState(TypedDict):
     thought: str
     next_action: str
     done: bool
+    steps_remaining: int
 
 
 def reason_about_screen(state: BrowserState) -> BrowserState:
@@ -26,11 +31,13 @@ def reason_about_screen(state: BrowserState) -> BrowserState:
         context="LangGraph node for browser-state planning.",
     )
     action = result["data"].get("action") or {}
+    steps_remaining = max(state["steps_remaining"] - 1, 0)
     return {
         **state,
         "thought": action.get("thought", ""),
         "next_action": result["data"].get("suggested_actions", ["finished"])[0],
-        "done": action.get("type") == "finished",
+        "done": action.get("type") == "finished" or steps_remaining == 0,
+        "steps_remaining": steps_remaining,
     }
 
 
@@ -60,6 +67,15 @@ if __name__ == "__main__":
             "thought": "",
             "next_action": "",
             "done": False,
+            "steps_remaining": 1,
         }
     )
-    print(result)
+    print(
+        {
+            "goal": result["goal"],
+            "thought": result["thought"],
+            "next_action": result["next_action"],
+            "done": result["done"],
+            "steps_remaining": result["steps_remaining"],
+        }
+    )

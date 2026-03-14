@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import base64
 import os
+import sys
+from pathlib import Path
 
 from crewai import Agent, Crew, Process, Task
 from crewai.tools import tool
 from dotenv import load_dotenv
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from lib.beakvision import parse_screenshot
 
@@ -34,6 +38,12 @@ def inspect_ui(goal: str) -> str:
 if __name__ == "__main__":
     load_dotenv()
     goal = os.getenv("BEAKVISION_GOAL", "Find the next step to complete checkout.")
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+
+    if not openai_api_key:
+        print("OPENAI_API_KEY not set. Running BeakVision tool smoke test instead of Crew kickoff.")
+        print(inspect_ui.run(goal))
+        raise SystemExit(0)
 
     planner = Agent(
         role="UI Planner",

@@ -4,6 +4,7 @@ import os
 import time
 from typing import Any, Dict
 
+import requests
 from appium import webdriver
 from appium.options.common.base import AppiumOptions
 from dotenv import load_dotenv
@@ -23,13 +24,22 @@ def screenshot_base64(driver: webdriver.Remote) -> str:
 
 
 def build_driver() -> webdriver.Remote:
+    server_url = required("APPIUM_SERVER_URL")
+    try:
+        response = requests.get(f"{server_url}/status", timeout=5)
+        response.raise_for_status()
+    except Exception as exc:
+        raise RuntimeError(
+            f"Appium server is not reachable at {server_url}. Start Appium before running mobile_test.py."
+        ) from exc
+
     options = AppiumOptions()
     options.set_capability("platformName", required("APPIUM_PLATFORM_NAME"))
     options.set_capability("appium:deviceName", required("APPIUM_DEVICE_NAME"))
     options.set_capability("appium:automationName", "UiAutomator2")
     options.set_capability("appium:appPackage", required("APPIUM_APP_PACKAGE"))
     options.set_capability("appium:appActivity", required("APPIUM_APP_ACTIVITY"))
-    return webdriver.Remote(required("APPIUM_SERVER_URL"), options=options)
+    return webdriver.Remote(server_url, options=options)
 
 
 def perform(driver: webdriver.Remote, action: Dict[str, Any]) -> None:
@@ -96,4 +106,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as exc:
+        print(f"mobile_test.py failed: {exc}")
+        raise SystemExit(1)

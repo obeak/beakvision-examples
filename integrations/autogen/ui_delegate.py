@@ -3,10 +3,14 @@ from __future__ import annotations
 import asyncio
 import base64
 import os
+import sys
+from pathlib import Path
 
 from autogen_agentchat.agents import AssistantAgent
 from dotenv import load_dotenv
 from autogen_ext.models.openai import OpenAIChatCompletionClient
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from lib.beakvision import parse_screenshot
 
@@ -34,6 +38,11 @@ async def beakvision_plan(goal: str) -> str:
 
 async def main() -> None:
     load_dotenv()
+    if not os.getenv("OPENAI_API_KEY"):
+        print("OPENAI_API_KEY not set. Running BeakVision tool smoke test instead of AutoGen agent run.")
+        print(await beakvision_plan(os.getenv("BEAKVISION_GOAL", "Find the next step to complete checkout.")))
+        return
+
     model_client = OpenAIChatCompletionClient(
         model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
     )
