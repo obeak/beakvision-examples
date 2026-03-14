@@ -1,0 +1,144 @@
+# BeakVision Examples
+
+Open-source examples for turning any screenshot into structured UI elements, exact coordinates, grounded actions, and next-step reasoning with a single `POST /v1/parse`.
+
+![Browser playground demo](./assets/playground-browser.gif)
+![Mobile playground demo](./assets/playground-mobile.gif)
+![Grounding playground demo](./assets/playground-grounding.gif)
+
+## What is inside
+
+- `browser_agent.ts` — Playwright loop that screenshots a browser, asks BeakVision what to do next, and executes the returned action.
+- `mobile_test.py` — Appium-driven mobile test that converts each device screenshot into the next tap, scroll, type, or drag.
+- `qa_automation/` — smoke-test and regression-watchdog examples for QA teams.
+- `integrations/langgraph/` — LangGraph state machine that treats BeakVision as the UI planner node.
+- `integrations/crewai/` — CrewAI example for handing a screenshot to a UI-planning crew member.
+- `integrations/autogen/` — AutoGen example that injects grounded screen reasoning into an agent conversation.
+
+## Why teams use this
+
+- One endpoint: screenshot in, action out.
+- Works across browser, desktop, and mobile screenshots.
+- Returns structured elements, exact coordinates, and an actionable next step.
+- Fast enough for agent loops, cheap enough for broad QA and RPA coverage.
+- No SDKs required.
+
+## 30-second setup
+
+```bash
+git clone https://github.com/openbeak/beakvision-examples.git
+cd beakvision-examples
+cp .env.example .env
+npm install
+pip install -r requirements.txt
+```
+
+Set these env vars in `.env`:
+
+```bash
+BEAKVISION_PARSE_URL=https://your-beakvision-host/v1/parse
+BEAKVISION_API_KEY=your_api_key
+TARGET_URL=https://example.com
+BEAKVISION_GOAL=Log into the app and open the billing settings page.
+```
+
+## Example 1: Browser agent
+
+```bash
+npm run browser-agent
+```
+
+The Playwright loop:
+
+1. Opens a browser page.
+2. Captures a screenshot.
+3. Sends the screenshot to BeakVision in `computer` mode.
+4. Reads back `thought`, `suggested_actions`, and exact coordinates.
+5. Executes the returned click, type, scroll, drag, or hotkey.
+
+## Example 2: Mobile test
+
+```bash
+python mobile_test.py
+```
+
+This example uses Appium plus BeakVision `mobile` mode to drive Android UI flows from screenshots instead of brittle selector-only scripts.
+
+## Example 3: QA automation
+
+```bash
+npm run qa:smoke
+npm run qa:watch
+```
+
+`qa_automation/web_smoke.ts` uses `ground` mode to localize critical controls on a page.
+
+`qa_automation/regression_watchdog.ts` uses `computer` mode to describe blockers, overlays, and the next step in a fragile flow.
+
+## Framework integrations
+
+### LangGraph
+
+```bash
+pip install -r requirements-langgraph.txt
+python integrations/langgraph/browser_graph.py
+```
+
+### CrewAI
+
+```bash
+pip install -r requirements-crewai.txt
+python integrations/crewai/crew_agent.py
+```
+
+### AutoGen
+
+```bash
+pip install -r requirements-autogen.txt
+python integrations/autogen/ui_delegate.py
+```
+
+## Raw API shape
+
+Every example uses the same request shape:
+
+```json
+{
+  "image": "<base64 screenshot>",
+  "mode": "computer",
+  "context": "Browser automation loop. Current URL: https://example.com.",
+  "goal": "Open the billing settings page."
+}
+```
+
+And reads back the same key fields:
+
+```json
+{
+  "success": true,
+  "data": {
+    "elements": [],
+    "suggested_actions": ["click(410, 190)"],
+    "action": {
+      "type": "click",
+      "point": { "x": 410, "y": 190 },
+      "thought": "The billing settings entry is visible in the sidebar."
+    }
+  }
+}
+```
+
+## Good fits
+
+- Browser agents
+- Desktop agents
+- Mobile testing
+- QA automation
+- RPA
+- Accessibility tooling
+
+## Notes
+
+- These examples intentionally use raw `fetch` and `requests` calls so you can see the full BeakVision contract.
+- Replace the placeholder host in `.env.example` with your deployed or hosted BeakVision parse endpoint.
+- The GIFs live in `assets/` so you can swap them with fresh playground captures anytime.

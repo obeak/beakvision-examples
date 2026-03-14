@@ -1,0 +1,20 @@
+{
+  "name": "beakvision-examples",
+  "version": "1.0.0",
+  "private": false,
+  "type": "module",
+  "scripts": {
+    "browser-agent": "tsx browser_agent.ts",
+    "qa:smoke": "tsx qa_automation/web_smoke.ts",
+    "qa:watch": "tsx qa_automation/regression_watchdog.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "playwright": "^1.55.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
