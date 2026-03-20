@@ -107,8 +107,8 @@ python -m playwright install chromium
 import json, base64, urllib.request
 from playwright.sync_api import sync_playwright
 
-OPENBEAK_URL = "http://localhost:8787/v1/parse"
-API_KEY = "bv_8fd221760f814c40453a985bfcfb23fc5aa2c19b2d3652b8b5fd7199256b3a1a"
+OPENBEAK_URL = "https://vision.openbeak.ai/v1/parse"
+API_KEY = os.environ.get("OPENBEAK_API_KEY", "")
 
 def openbeak_analyze(image_path, goal, mode="computer"):
     with open(image_path, "rb") as f:

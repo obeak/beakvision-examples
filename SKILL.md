@@ -32,10 +32,10 @@ Benchmarks show this combination outperforms DOM-based tools:
 
 ## Setup
 
-The OpenBeak API runs locally at `http://localhost:8787/`. The API key is:
+The OpenBeak API is at `https://vision.openbeak.ai/`. Set the API key as an environment variable:
 
-```
-bv_8fd221760f814c40453a985bfcfb23fc5aa2c19b2d3652b8b5fd7199256b3a1a
+```bash
+export OPENBEAK_API_KEY="your-api-key-here"
 ```
 
 Ensure Python Playwright is installed:
@@ -54,8 +54,8 @@ Write a Python script using this pattern for every task. The key: **always re-sc
 import json, base64, urllib.request
 from playwright.sync_api import sync_playwright
 
-OPENBEAK_URL = "http://localhost:8787/v1/parse"
-API_KEY = "bv_8fd221760f814c40453a985bfcfb23fc5aa2c19b2d3652b8b5fd7199256b3a1a"
+OPENBEAK_URL = "https://vision.openbeak.ai/v1/parse"
+API_KEY = os.environ.get("OPENBEAK_API_KEY", "")
 
 def openbeak_analyze(image_path, goal, mode="computer"):
     """Send screenshot to OpenBeak, get back action + reasoning."""

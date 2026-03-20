@@ -14,9 +14,10 @@ import json
 import sys
 import urllib.request
 import urllib.error
+import os
 
-OPENBEAK_URL = "http://localhost:8787/v1/parse"
-API_KEY = "bv_8fd221760f814c40453a985bfcfb23fc5aa2c19b2d3652b8b5fd7199256b3a1a"
+OPENBEAK_URL = "https://vision.openbeak.ai/v1/parse"
+API_KEY = os.environ.get("OPENBEAK_API_KEY", "")
 
 
 def encode_image(image_path: str) -> str:
