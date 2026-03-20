@@ -1,182 +1,199 @@
-# BeakVision Examples
+# BeakVision + Playwright: AI-Powered Browser Automation
 
-Open-source examples for turning any screenshot into structured UI elements, exact coordinates, grounded actions, and next-step reasoning with a single `POST /v1/parse`.
+An intelligent browser automation skill that combines **OpenBeak's GUI Vision API** with **Playwright** to complete complex web tasks. The agent sees pages through screenshots, reasons about what to do using AI vision, and acts using Playwright's low-level browser APIs.
 
-![Browser playground demo](./assets/playground-browser.gif)
-![Mobile playground demo](./assets/playground-mobile.gif)
-![Grounding playground demo](./assets/playground-grounding.gif)
+![Benchmark Summary](screenshots/05-benchmark-summary.png)
 
-## What is inside
+## How It Works
 
-- `browser_agent.ts` — Playwright loop that screenshots a browser, asks BeakVision what to do next, and executes the returned action.
-- `mac_desktop_agent.ts` — native macOS desktop loop using `screencapture` + BeakVision + `cliclick`.
-- `mobile_test.py` — Appium-driven mobile test that converts each device screenshot into the next tap, scroll, type, or drag.
-- `qa_automation/` — smoke-test and regression-watchdog examples for QA teams.
-- `integrations/langgraph/` — LangGraph state machine that treats BeakVision as the UI planner node.
-- `integrations/crewai/` — CrewAI example for handing a screenshot to a UI-planning crew member.
-- `integrations/autogen/` — AutoGen example that injects grounded screen reasoning into an agent conversation.
+```
+Screenshot → OpenBeak /v1/parse → Action + Reasoning → Playwright executes → Repeat
+```
 
-## Why teams use this
+1. Playwright navigates to a page and takes a screenshot
+2. The screenshot is sent to OpenBeak's vision API with a goal description
+3. OpenBeak returns the next action (click, type, scroll) with pixel coordinates and reasoning
+4. Playwright executes the action using `mouse.click()` and `keyboard.type()`
+5. The loop repeats until the task is complete
 
-- One endpoint: screenshot in, action out.
-- Works across browser, desktop, and mobile screenshots.
-- Returns structured elements, exact coordinates, and an actionable next step.
-- Fast enough for agent loops, cheap enough for broad QA and RPA coverage.
-- No SDKs required.
+![BeakVision Homepage](screenshots/01-homepage.png)
 
-## 30-second setup
+## Benchmark: BeakVision + Playwright vs agent-browser
+
+We benchmarked 5 tasks against agent-browser (a DOM-based CLI tool). Two tasks were specifically designed to require visual understanding.
+
+![Benchmark Timing Chart](screenshots/06-benchmark-chart.png)
+
+### Results
+
+| Task | agent-browser | BeakVision + Playwright |
+|------|:---:|:---:|
+| T1: Navigate to Pricing | PASS (5.7s) | PASS (12.6s) |
+| T2: Login -> Sign Up | PASS (8.4s) | PASS (14.2s) |
+| T3: Playground Form Fill | **FAIL** (31.4s timeout) | PASS (17.1s) |
+| T4: Select Pro Plan (HARD) | **FAIL** (blind guess) | PASS (15.3s) |
+| T5: Mode Switch + Fill + Verify (HARD) | **FAIL** (2 failures) | PASS (21.7s) |
+| **Total** | **2/5 (40%)** | **5/5 (100%)** |
+
+### Why agent-browser Failed
+
+![Failure Analysis](screenshots/07-benchmark-failures.png)
+
+**T3 - Custom React Input**: agent-browser's `fill` command timed out after 25 seconds. The playground's Goal input is a custom React component that doesn't respond to standard Playwright fill events. BeakVision used vision-guided `mouse.click()` + `keyboard.type()` to bypass it.
+
+**T4 - Identical Buttons (the killer test)**: The pricing page has three plan cards (Ultra, Pro, Metered), each with a `get_access()` button. In the DOM, all three buttons are identical:
+
+```
+button "get_access()" [ref=e12]
+button "get_access()" [ref=e13] [nth=1]
+button "get_access()" [ref=e14] [nth=2]
+```
+
+agent-browser has **zero way** to know which plan each button belongs to — the plan names (Ultra, Pro, Metered) and prices ($9.99, $4.99) are non-interactive text invisible to `snapshot -i`. It can only blind-guess by index.
+
+BeakVision read the screenshot, identified "$4.99/month" and "Pro" visually, and clicked the correct button:
+
+> *"I noticed three 'get_access' buttons. The Pro plan costs $4.99/month, displayed in the middle. Its button is right below the Pro card."*
+
+![Pricing Cards](screenshots/02-pricing-cards.png)
+
+**T5 - Visual State Verification**: After switching from "Mobile Use" to "Grounding" mode, the UI shows a green badge labeled "Grounding" next to the Goal field. This badge is a non-interactive visual element — `snapshot -i` can't see it. agent-browser clicked the tab but couldn't verify the mode actually changed. Plus the same custom input failure as T3.
+
+BeakVision confirmed the state change visually:
+
+> *"The page has switched to Grounding mode. There is a green badge labeled 'Grounding' near the Goal input field. The mode switch was successful."*
+
+![Playground](screenshots/04-playground.png)
+
+### Performance Comparison
+
+| Metric | agent-browser | BeakVision + Playwright |
+|--------|:---:|:---:|
+| Success Rate | 40% (2/5) | **100% (5/5)** |
+| Avg Time (passing) | 7.1s | 16.2s |
+| Avg Steps | 5.6 | 9.8 |
+| Total Tokens | 0 | 25,941 |
+| Est. Cost | Free | < $0.01 |
+| Reads Visual Content | No | **Yes** |
+| Custom Components | Fails | **keyboard.type()** |
+| Visual Verification | No | **Yes** |
+| Explainability | Low | **High** (reasoning thoughts) |
+
+### Capability Matrix
+
+| Capability | agent-browser | BeakVision + PW |
+|------------|:---:|:---:|
+| Element Discovery | 4/5 | 5/5 |
+| Execution Speed | 5/5 | 3/5 |
+| Unknown UI Adaptability | 3/5 | 5/5 |
+| Visual Context Understanding | 0/5 | 5/5 |
+| Custom Component Handling | 2/5 | 5/5 |
+| Multi-Page Workflows | 4/5 | 5/5 |
+| Visual State Verification | 0/5 | 5/5 |
+| Error Recovery | 2/5 | 4/5 |
+
+## Quick Start
+
+### Prerequisites
 
 ```bash
-git clone https://github.com/openbeak/beakvision-examples.git
-cd beakvision-examples
-cp .env.example .env
-npm install
-pip install -r requirements.txt
+pip install playwright
+python -m playwright install chromium
 ```
 
-Set these env vars in `.env`:
+### Usage
+
+```python
+import json, base64, urllib.request
+from playwright.sync_api import sync_playwright
+
+OPENBEAK_URL = "http://localhost:8787/v1/parse"
+API_KEY = "bv_8fd221760f814c40453a985bfcfb23fc5aa2c19b2d3652b8b5fd7199256b3a1a"
+
+def openbeak_analyze(image_path, goal, mode="computer"):
+    with open(image_path, "rb") as f:
+        image_b64 = base64.b64encode(f.read()).decode("utf-8")
+    payload = json.dumps({"image": image_b64, "mode": mode, "goal": goal}).encode()
+    req = urllib.request.Request(OPENBEAK_URL, data=payload, headers={
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json",
+    }, method="POST")
+    with urllib.request.urlopen(req, timeout=45) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=True)
+    page = browser.new_page(viewport={"width": 1280, "height": 720})
+
+    page.goto("https://example.com")
+    page.wait_for_load_state("networkidle")
+    page.screenshot(path="/tmp/step.png")
+
+    result = openbeak_analyze("/tmp/step.png", "Click the Sign Up button")
+    action = result["data"]["action"]
+    print(f"Thought: {action['thought']}")
+
+    page.mouse.click(action["point"]["x"], action["point"]["y"])
+    browser.close()
+```
+
+### Key Rule: Always use `keyboard.type()` for text input
+
+```python
+# DON'T - fails on custom components
+page.fill("input", "text")
+
+# DO - works everywhere
+page.mouse.click(x, y)          # click at OpenBeak coordinates
+page.wait_for_timeout(300)
+page.keyboard.type("text", delay=20)  # individual keystrokes
+```
+
+### Helper Script
 
 ```bash
-BEAKVISION_PARSE_URL=https://your-beakvision-host/v1/parse
-BEAKVISION_API_KEY=your_api_key
-TARGET_URL=https://example.com
-BEAKVISION_GOAL=Log into the app and open the billing settings page.
-BEAKVISION_SUCCESS_URL_CONTAINS=#billing
+python scripts/analyze.py --image screenshot.png --goal "Click submit" --mode computer
 ```
 
-## Example 1: Browser agent
+## OpenBeak API
 
-```bash
-npm run browser-agent
+**Endpoint**: `POST /v1/parse`
+
+**Modes**:
+- `computer` - Desktop/browser screenshots (click, type, scroll, hotkey, drag)
+- `mobile` - Mobile viewports (click, long_press, type, scroll)
+- `ground` - Quick element localization by name (coordinates only, no reasoning)
+
+**Response** includes:
+- `action.type` - What to do
+- `action.point` - Where (x, y coordinates)
+- `action.thought` - Why (AI reasoning)
+- `elements[]` - All detected UI elements with bounding boxes
+- `screen_description` - What the AI sees
+
+## Files
+
+```
+beakvision-examples/
+  SKILL.md              # Claude Code skill definition
+  scripts/analyze.py    # OpenBeak API helper script
+  benchmark.html        # Interactive benchmark report (open in browser)
+  benchmark-results.json # Raw benchmark data
+  screenshots/          # Task screenshots
+    01-homepage.png
+    02-pricing-cards.png
+    03-login-page.png
+    04-playground.png
+    05-benchmark-summary.png
+    06-benchmark-chart.png
+    07-benchmark-failures.png
 ```
 
-The Playwright loop:
+## Interactive Benchmark Report
 
-1. Opens a browser page.
-2. Captures a screenshot.
-3. Sends the screenshot plus task state, action history, and completion criteria to BeakVision in `computer` mode.
-4. Reads back `thought`, `suggested_actions`, and exact coordinates.
-5. Executes the returned click, type, scroll, drag, or hotkey.
-6. Stops when the success condition is met or the model marks the task `finished`.
-
-Useful browser-agent env vars:
-
-- `BEAKVISION_SUCCESS_URL_CONTAINS` lets the runner stop when the URL reaches a known fragment or path.
-- `BEAKVISION_SUCCESS_TEXT_CONTAINS` lets the runner stop when specific visible text appears.
-- `BEAKVISION_SUCCESS_SELECTOR` lets the runner stop when a CSS selector exists.
-- `BEAKVISION_MAX_STEPS` caps the loop.
-
-## Example 2: Mobile test
-
-```bash
-python mobile_test.py
-```
-
-This example uses Appium plus BeakVision `mobile` mode to drive Android UI flows from screenshots instead of brittle selector-only scripts.
-
-## Example 3: macOS desktop control
-
-Install the click helper once:
-
-```bash
-brew install cliclick
-```
-
-Then run:
-
-```bash
-MACOS_APP_NAME=Calculator \
-BEAKVISION_GOAL="Click the 7 button in Calculator." \
-npm run mac-agent
-```
-
-Notes:
-
-- This example captures the live macOS desktop with `screencapture`.
-- It scales BeakVision pixel coordinates into macOS desktop coordinates before executing them with `cliclick`.
-- macOS Accessibility permission is required for real clicks and typing.
-- macOS Screen Recording permission is required so the script can capture the desktop screenshot it sends to BeakVision.
-- Set `MACOS_DRY_RUN=true` if you want to print the planned desktop actions without executing them.
-
-## Example 4: QA automation
-
-```bash
-npm run qa:smoke
-npm run qa:watch
-```
-
-`qa_automation/web_smoke.ts` uses `ground` mode to localize critical controls on a page.
-
-`qa_automation/regression_watchdog.ts` uses `computer` mode to describe blockers, overlays, and the next step in a fragile flow.
-
-## Framework integrations
-
-### LangGraph
-
-```bash
-pip install -r requirements-langgraph.txt
-python integrations/langgraph/browser_graph.py
-```
-
-### CrewAI
-
-```bash
-pip install -r requirements-crewai.txt
-python integrations/crewai/crew_agent.py
-```
-
-Without `OPENAI_API_KEY`, this script falls back to a BeakVision tool smoke test so you can verify the integration wiring locally.
-
-### AutoGen
-
-```bash
-pip install -r requirements-autogen.txt
-python integrations/autogen/ui_delegate.py
-```
-
-Without `OPENAI_API_KEY`, this script falls back to a BeakVision tool smoke test so you can verify the integration wiring locally.
-
-## Raw API shape
-
-Every example uses the same request shape:
-
-```json
-{
-  "image": "<base64 screenshot>",
-  "mode": "computer",
-  "context": "Browser automation loop. Current URL: https://example.com.",
-  "goal": "Open the billing settings page."
-}
-```
-
-And reads back the same key fields:
-
-```json
-{
-  "success": true,
-  "data": {
-    "elements": [],
-    "suggested_actions": ["click(410, 190)"],
-    "action": {
-      "type": "click",
-      "point": { "x": 410, "y": 190 },
-      "thought": "The billing settings entry is visible in the sidebar."
-    }
-  }
-}
-```
-
-## Good fits
-
-- Browser agents
-- Desktop agents
-- Mobile testing
-- QA automation
-- RPA
-- Accessibility tooling
-
-## Notes
-
-- These examples intentionally use raw `fetch` and `requests` calls so you can see the full BeakVision contract.
-- Replace the placeholder host in `.env.example` with your deployed or hosted BeakVision parse endpoint.
-- The GIFs live in `assets/` so you can swap them with fresh playground captures anytime.
+Open `benchmark.html` in your browser for the full interactive report with:
+- Timing bar charts for all 5 tasks
+- Step-by-step execution timelines with OpenBeak's reasoning thoughts
+- Failure analysis table
+- Token usage and cost breakdown
+- Capability matrix

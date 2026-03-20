@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Benchmark: agent-browser vs BeakVision + Playwright</title>
+<style>
+:root{--bg:#0d1117;--sf:#161b22;--sf2:#1c2333;--bd:#30363d;--tx:#e6edf3;--tm:#8b949e;--gn:#3fb950;--gn2:rgba(63,185,80,.12);--rd:#f85149;--rd2:rgba(248,81,73,.12);--bl:#58a6ff;--pu:#bc8cff;--or:#d29922;--cy:#39d353;--ab:#58a6ff;--bv:#3fb950}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--tx);line-height:1.6}
+.hero{background:linear-gradient(135deg,#0d1117,#161b22 50%,#1a2332);border-bottom:1px solid var(--bd);padding:56px 40px 48px;text-align:center}
+.hero h1{font-size:2.3rem;font-weight:700;margin-bottom:10px;background:linear-gradient(135deg,var(--bl),var(--gn));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{color:var(--tm);font-size:1.05rem;max-width:720px;margin:0 auto}
+.hero .sub{color:var(--tm);font-size:.82rem;margin-top:12px;opacity:.7}
+.c{max-width:1200px;margin:0 auto;padding:36px 24px}
+.leg{display:flex;gap:28px;justify-content:center;margin-bottom:36px;flex-wrap:wrap}
+.leg-i{display:flex;align-items:center;gap:8px;font-size:.92rem}
+.dot{width:13px;height:13px;border-radius:50%}
+
+/* Winner */
+.win{background:linear-gradient(135deg,rgba(63,185,80,.08),rgba(88,166,255,.08));border:1px solid rgba(63,185,80,.25);border-radius:12px;padding:24px 28px;text-align:center;margin-bottom:36px}
+.win h2{font-size:1.25rem;margin-bottom:6px}.win p{color:var(--tm);font-size:.92rem}
+.win-b{display:flex;justify-content:center;gap:20px;margin-top:14px;flex-wrap:wrap}
+.win-bb{padding:6px 18px;border-radius:8px;font-size:.83rem;font-weight:600}
+
+/* Summary */
+.sg{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;margin-bottom:44px}
+.sc{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:26px;text-align:center;position:relative;overflow:hidden}
+.sc::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.sc.ab::before{background:var(--ab)}.sc.bv::before{background:var(--bv)}
+.sc h3{font-size:.78rem;color:var(--tm);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+.sc .lb{font-size:1rem;font-weight:600;margin-bottom:16px}
+.sts{display:flex;justify-content:space-around}.st{text-align:center}
+.st .v{font-size:1.6rem;font-weight:700}.st .u{font-size:.7rem;color:var(--tm);display:block;margin-top:2px}
+
+.sct{font-size:1.3rem;font-weight:600;margin:44px 0 20px;padding-bottom:10px;border-bottom:1px solid var(--bd)}
+
+/* Charts */
+.cc{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:28px;margin-bottom:28px}
+.ct{font-size:.92rem;font-weight:600;margin-bottom:20px;color:var(--tm);text-transform:uppercase;letter-spacing:.5px}
+.bg{margin-bottom:18px}.bgt{font-size:.88rem;font-weight:600;margin-bottom:8px}
+.bgt .hard{color:var(--or);font-size:.75rem;font-weight:700;background:rgba(210,153,34,.15);padding:2px 8px;border-radius:4px;margin-left:8px}
+.br{display:flex;align-items:center;gap:10px;margin-bottom:5px}
+.bl{width:190px;font-size:.78rem;color:var(--tm);text-align:right;flex-shrink:0}
+.bt{flex:1;height:30px;background:var(--sf2);border-radius:6px;overflow:hidden}
+.bf{height:100%;border-radius:6px;display:flex;align-items:center;padding-left:10px;font-size:.78rem;font-weight:600;color:#fff;min-width:fit-content}
+.bf.ab{background:linear-gradient(90deg,var(--ab),#79bbff)}.bf.bv{background:linear-gradient(90deg,var(--bv),#56d364)}
+.bf.fl{background:linear-gradient(90deg,var(--rd),#ff6e6e);opacity:.55}
+.bval{font-size:.78rem;color:var(--tm);flex-shrink:0;width:72px;text-align:center}
+.badge{display:inline-block;padding:2px 9px;border-radius:16px;font-size:.72rem;font-weight:600}
+.badge.pass{background:var(--gn2);color:var(--gn)}.badge.fail{background:var(--rd2);color:var(--rd)}
+
+/* Task cards */
+.tc{background:var(--sf);border:1px solid var(--bd);border-radius:12px;margin-bottom:20px;overflow:hidden}
+.th{padding:16px 24px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+.th:hover{background:var(--sf2)}.th h3{font-size:1.05rem}.th .ar{color:var(--tm);transition:transform .2s}.th.op .ar{transform:rotate(90deg)}
+.tb{padding:0 24px 20px;display:none}.tb.op{display:block}
+.as{margin-bottom:20px;margin-top:14px}
+.al{font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:flex;align-items:center;gap:7px}
+.al .d{width:9px;height:9px;border-radius:50%}
+.sp{display:flex;align-items:flex-start;gap:10px;padding:6px 0;border-left:2px solid var(--bd);margin-left:4px;padding-left:14px;position:relative}
+.sp::before{content:'';position:absolute;left:-5px;top:10px;width:8px;height:8px;border-radius:50%;background:var(--bd)}
+.sp.p::before{background:var(--gn)}.sp.f::before{background:var(--rd)}
+.sa{flex:1;font-size:.82rem}.sd{font-size:.78rem;color:var(--tm);font-family:monospace;min-width:74px;text-align:right}
+.stht{font-size:.76rem;color:var(--tm);font-style:italic;margin-top:3px;padding:5px 9px;background:var(--sf2);border-radius:5px;border-left:2px solid var(--bv)}
+.err{font-size:.76rem;color:var(--rd);margin-top:3px;padding:5px 9px;background:var(--rd2);border-radius:5px;border-left:2px solid var(--rd)}
+
+/* Table */
+table{width:100%;border-collapse:collapse;margin-top:14px}
+th,td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--bd);font-size:.88rem}
+th{color:var(--tm);font-weight:600;font-size:.78rem;text-transform:uppercase;letter-spacing:.5px}
+tr:hover td{background:var(--sf2)}
+
+/* Insights */
+.ig{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:18px;margin-top:20px}
+.ic{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:22px}
+.ic h4{font-size:.95rem;margin-bottom:8px}.ic p{font-size:.87rem;color:var(--tm)}
+.hl{color:var(--gn);font-weight:600}
+
+/* Capability */
+.cg{display:grid;grid-template-columns:190px repeat(2,1fr);gap:1px;background:var(--bd);border-radius:12px;overflow:hidden;margin-top:18px}
+.cx{padding:12px 14px;background:var(--sf);font-size:.83rem}
+.ch{font-weight:700;color:var(--tm);text-transform:uppercase;font-size:.72rem;letter-spacing:.5px}
+.cl{font-weight:600}.cr{text-align:center}.stars{font-size:1.05rem;letter-spacing:2px}
+
+@media(max-width:768px){.sg{grid-template-columns:1fr}.hero h1{font-size:1.7rem}.bl{width:120px}.cg{grid-template-columns:140px repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="hero">
+<h1>agent-browser vs BeakVision + Playwright</h1>
+<p>5 browser automation tasks — from simple navigation to vision-dependent challenges that require reading visual context to succeed</p>
+<div class="sub">March 19, 2026 &middot; BeakVision (localhost:8787) &middot; OpenBeak UI-TARS 1.5 &middot; Chromium headless</div>
+</div>
+<div class="c">
+
+<div class="leg">
+<div class="leg-i"><span class="dot" style="background:var(--ab)"></span><strong>agent-browser</strong> <span style="color:var(--tm)">(DOM refs)</span></div>
+<div class="leg-i"><span class="dot" style="background:var(--bv)"></span><strong>BeakVision + Playwright</strong> <span style="color:var(--tm)">(AI vision)</span></div>
+</div>
+
+<div class="win">
+<h2>BeakVision + Playwright: 5/5 &middot; agent-browser: 2/5</h2>
+<p>Vision-augmented automation passed every task including two hard tests specifically designed to require visual understanding — identifying pricing plans by reading card content, and verifying UI mode changes from visual labels.</p>
+<div class="win-b">
+<span class="win-bb" style="background:var(--gn2);color:var(--gn)">5/5 Passed (100%)</span>
+<span class="win-bb" style="background:rgba(88,166,255,.1);color:var(--bl)">agent-browser: 2/5 (40%)</span>
+<span class="win-bb" style="background:rgba(188,140,255,.1);color:var(--pu)">25,941 total tokens</span>
+</div>
+</div>
+
+<!-- Summary Cards -->
+<div class="sg">
+<div class="sc ab"><h3>agent-browser</h3><div class="lb">DOM-Based CLI Automation</div><div class="sts">
+<div class="st"><div class="v" style="color:var(--ab)">2/5</div><span class="u">Tasks Passed</span></div>
+<div class="st"><div class="v" style="color:var(--ab)">7.1s</div><span class="u">Avg (pass)</span></div>
+<div class="st"><div class="v" style="color:var(--ab)">0</div><span class="u">Tokens</span></div>
+<div class="st"><div class="v" style="color:var(--ab)">5</div><span class="u">Avg Steps</span></div>
+</div></div>
+<div class="sc bv"><h3>BeakVision + Playwright</h3><div class="lb">AI Vision-Augmented</div><div class="sts">
+<div class="st"><div class="v" style="color:var(--bv)">5/5</div><span class="u">Tasks Passed</span></div>
+<div class="st"><div class="v" style="color:var(--bv)">16.2s</div><span class="u">Avg Time</span></div>
+<div class="st"><div class="v" style="color:var(--bv)">25,941</div><span class="u">Tokens</span></div>
+<div class="st"><div class="v" style="color:var(--bv)">9.8</div><span class="u">Avg Steps</span></div>
+</div></div>
+</div>
+
+<!-- Timing Chart -->
+<div class="cc">
+<div class="ct">Execution Time (ms) — all 5 tasks</div>
+
+<div class="bg"><div class="bgt">T1: Navigate to Pricing</div>
+<div class="br"><div class="bl">agent-browser</div><div class="bt"><div class="bf ab" style="width:26.3%">5,707ms</div></div><div class="bval"><span class="badge pass">PASS</span></div></div>
+<div class="br"><div class="bl">BeakVision + Playwright</div><div class="bt"><div class="bf bv" style="width:58.2%">12,635ms</div></div><div class="bval"><span class="badge pass">PASS</span></div></div>
+</div>
+
+<div class="bg"><div class="bgt">T2: Login → Sign Up</div>
+<div class="br"><div class="bl">agent-browser</div><div class="bt"><div class="bf ab" style="width:38.8%">8,412ms</div></div><div class="bval"><span class="badge pass">PASS</span></div></div>
+<div class="br"><div class="bl">BeakVision + Playwright</div><div class="bt"><div class="bf bv" style="width:65.3%">14,190ms</div></div><div class="bval"><span class="badge pass">PASS</span></div></div>
+</div>
+
+<div class="bg"><div class="bgt">T3: Playground Form Fill</div>
+<div class="br"><div class="bl">agent-browser</div><div class="bt"><div class="bf fl" style="width:100%">31,397ms (timeout)</div></div><div class="bval"><span class="badge fail">FAIL</span></div></div>
+<div class="br"><div class="bl">BeakVision + Playwright</div><div class="bt"><div class="bf bv" style="width:54.5%">17,098ms</div></div><div class="bval"><span class="badge pass">PASS</span></div></div>
+</div>
+
+<div class="bg"><div class="bgt">T4: Select Pro Plan by Visual Context <span class="hard">HARD</span></div>
+<div class="br"><div class="bl">agent-browser</div><div class="bt"><div class="bf fl" style="width:20.5%">4,455ms (blind guess)</div></div><div class="bval"><span class="badge fail">FAIL</span></div></div>
+<div class="br"><div class="bl">BeakVision + Playwright</div><div class="bt"><div class="bf bv" style="width:70.4%">15,290ms</div></div><div class="bval"><span class="badge pass">PASS</span></div></div>
+</div>
+
+<div class="bg"><div class="bgt">T5: Switch Mode + Fill + Visual Verify <span class="hard">HARD</span></div>
+<div class="br"><div class="bl">agent-browser</div><div class="bt"><div class="bf fl" style="width:100%">32,750ms (2 failures)</div></div><div class="bval"><span class="badge fail">FAIL</span></div></div>
+<div class="br"><div class="bl">BeakVision + Playwright</div><div class="bt"><div class="bf bv" style="width:66.3%">21,717ms</div></div><div class="bval"><span class="badge pass">PASS</span></div></div>
+</div>
+</div>
+
+<!-- Why agent-browser failed -->
+<div class="cc">
+<div class="ct">Why agent-browser Failed: The 3 Failure Modes</div>
+<table>
+<thead><tr><th>Task</th><th>Failure</th><th>Root Cause</th></tr></thead>
+<tbody>
+<tr><td><strong>T3: Form Fill</strong></td><td>fill @e18 timed out (25s)</td><td>Custom React input component doesn't respond to standard Playwright fill events. <span style="color:var(--bv)">BV used keyboard.type() via pixel-click to bypass.</span></td></tr>
+<tr><td><strong>T4: Pro Plan</strong></td><td>Blind guess — can't identify correct button</td><td>All 3 pricing CTA buttons are labeled <code>get_access()</code>. Snapshot shows no plan names (non-interactive text). <span style="color:var(--bv)">BV read "$4.99/month" and "Pro" from the screenshot to identify the correct card.</span></td></tr>
+<tr><td><strong>T5: Mode+Fill</strong></td><td>Can't verify mode change + fill timeout</td><td>Mode badge ("Grounding") is a non-interactive visual label invisible to snapshot. Plus the same custom input issue. <span style="color:var(--bv)">BV confirmed green "Grounding" badge visually + used keyboard.type().</span></td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- Token/Latency -->
+<div class="cc">
+<div class="ct">BeakVision API Cost</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+<div>
+<div style="font-size:.82rem;color:var(--tm);margin-bottom:10px;font-weight:600">Tokens per Task</div>
+<div class="br"><div class="bl" style="width:120px">T1: Pricing</div><div class="bt"><div class="bf bv" style="width:39.4%">3,221</div></div><div class="bval">2 calls</div></div>
+<div class="br"><div class="bl" style="width:120px">T2: Login→Signup</div><div class="bt"><div class="bf bv" style="width:58.9%">4,810</div></div><div class="bval">3 calls</div></div>
+<div class="br"><div class="bl" style="width:120px">T3: Form Fill</div><div class="bt"><div class="bf bv" style="width:59.2%">4,837</div></div><div class="bval">3 calls</div></div>
+<div class="br"><div class="bl" style="width:120px">T4: Pro Plan</div><div class="bt"><div class="bf bv" style="width:60.1%">4,907</div></div><div class="bval">3 calls</div></div>
+<div class="br"><div class="bl" style="width:120px">T5: Mode+Fill</div><div class="bt"><div class="bf bv" style="width:100%">8,166</div></div><div class="bval">5 calls</div></div>
+</div>
+<div>
+<div style="font-size:.82rem;color:var(--tm);margin-bottom:10px;font-weight:600">Key Metrics</div>
+<table style="margin-top:0">
+<tr><td>Total tokens</td><td><strong>25,941</strong></td></tr>
+<tr><td>Total API calls</td><td><strong>16</strong></td></tr>
+<tr><td>Avg tokens/call</td><td><strong>~1,621</strong></td></tr>
+<tr><td>Avg latency/call</td><td><strong>~3.3s</strong></td></tr>
+<tr><td>Est. cost (metered)</td><td><strong>&lt; $0.01</strong></td></tr>
+</table>
+</div>
+</div>
+</div>
+
+<!-- Comparison Table -->
+<h2 class="sct">Head-to-Head Comparison</h2>
+<table>
+<thead><tr><th>Metric</th><th style="color:var(--ab)">agent-browser</th><th style="color:var(--bv)">BeakVision + Playwright</th></tr></thead>
+<tbody>
+<tr><td><strong>Success Rate</strong></td><td><span class="badge fail">40%</span> (2/5)</td><td><span class="badge pass">100%</span> (5/5)</td></tr>
+<tr><td><strong>Avg Time (passing)</strong></td><td>7,059ms</td><td>16,186ms</td></tr>
+<tr><td><strong>Avg Steps</strong></td><td>5.6</td><td>9.8</td></tr>
+<tr><td><strong>Requires Selectors</strong></td><td>No (auto-discovers)</td><td>No (vision-guided)</td></tr>
+<tr><td><strong>Reads Visual Content</strong></td><td><span class="badge fail">No</span></td><td><span class="badge pass">Yes</span></td></tr>
+<tr><td><strong>Custom Components</strong></td><td><span class="badge fail">Fails</span></td><td><span class="badge pass">keyboard.type()</span></td></tr>
+<tr><td><strong>Identifies Elements by Context</strong></td><td><span class="badge fail">No</span> — identical labels are ambiguous</td><td><span class="badge pass">Yes</span> — reads surrounding text/prices</td></tr>
+<tr><td><strong>Verifies Visual State</strong></td><td><span class="badge fail">No</span> — only sees interactive elements</td><td><span class="badge pass">Yes</span> — screenshots + AI analysis</td></tr>
+<tr><td><strong>Explainability</strong></td><td>Low (element refs)</td><td><strong>High</strong> (reasoning thoughts)</td></tr>
+<tr><td><strong>Tokens / Cost</strong></td><td>0 / Free</td><td>25,941 / &lt;$0.01</td></tr>
+</tbody>
+</table>
+
+<!-- Capability Matrix -->
+<h2 class="sct">Capability Matrix</h2>
+<div class="cg">
+<div class="cx ch">Capability</div><div class="cx ch" style="text-align:center;color:var(--ab)">agent-browser</div><div class="cx ch" style="text-align:center;color:var(--bv)">BeakVision + PW</div>
+<div class="cx cl">Element Discovery</div><div class="cx cr"><span class="stars">★★★★☆</span></div><div class="cx cr"><span class="stars">★★★★★</span></div>
+<div class="cx cl">Execution Speed</div><div class="cx cr"><span class="stars">★★★★★</span></div><div class="cx cr"><span class="stars">★★★☆☆</span></div>
+<div class="cx cl">Unknown UI Adaptability</div><div class="cx cr"><span class="stars">★★★☆☆</span></div><div class="cx cr"><span class="stars">★★★★★</span></div>
+<div class="cx cl">Visual Context Understanding</div><div class="cx cr"><span class="stars">☆☆☆☆☆</span></div><div class="cx cr"><span class="stars">★★★★★</span></div>
+<div class="cx cl">Custom Component Handling</div><div class="cx cr"><span class="stars">★★☆☆☆</span></div><div class="cx cr"><span class="stars">★★★★★</span></div>
+<div class="cx cl">Multi-Page Workflows</div><div class="cx cr"><span class="stars">★★★★☆</span></div><div class="cx cr"><span class="stars">★★★★★</span></div>
+<div class="cx cl">Visual State Verification</div><div class="cx cr"><span class="stars">☆☆☆☆☆</span></div><div class="cx cr"><span class="stars">★★★★★</span></div>
+<div class="cx cl">Error Recovery</div><div class="cx cr"><span class="stars">★★☆☆☆</span></div><div class="cx cr"><span class="stars">★★★★☆</span></div>
+<div class="cx cl">Agent Friendly</div><div class="cx cr"><span class="stars">★★★★★</span></div><div class="cx cr"><span class="stars">★★★★★</span></div>
+<div class="cx cl">Cost Efficiency</div><div class="cx cr"><span class="stars">★★★★★</span></div><div class="cx cr"><span class="stars">★★★★☆</span></div>
+</div>
+
+<!-- Step-by-Step -->
+<h2 class="sct">Step-by-Step Execution</h2>
+
+<!-- T1 -->
+<div class="tc"><div class="th" onclick="t(this)"><h3>T1: Navigate to Pricing</h3><span class="ar">▶</span></div>
+<div class="tb">
+<p style="color:var(--tm);margin-bottom:14px">Simple nav click. Both pass — agent-browser is 2.2x faster.</p>
+<div class="as"><div class="al"><span class="d" style="background:var(--ab)"></span> agent-browser <span class="badge pass">PASS</span> — 5,707ms</div>
+<div class="sp p"><div class="sa">open + wait (networkidle)</div><div class="sd">3,992ms</div></div>
+<div class="sp p"><div class="sa">snapshot -i → 27 elements</div><div class="sd">440ms</div></div>
+<div class="sp p"><div class="sa">click @e5 (Pricing)</div><div class="sd">860ms</div></div>
+<div class="sp p"><div class="sa">verify url</div><div class="sd">415ms</div></div></div>
+<div class="as"><div class="al"><span class="d" style="background:var(--bv)"></span> BeakVision + Playwright <span class="badge pass">PASS</span> — 12,635ms</div>
+<div class="sp p"><div class="sa">page.goto() + networkidle</div><div class="sd">1,645ms</div></div>
+<div class="sp p"><div class="sa">screenshot</div><div class="sd">74ms</div></div>
+<div class="sp p"><div class="sa">OpenBeak analyze<div class="stht">"I noticed 'Pricing' in the nav bar, right next to 'FAQ'. The text is white. By clicking on it, I can access the pricing page."</div></div><div class="sd">5,580ms</div></div>
+<div class="sp p"><div class="sa">mouse.click(752, 34)</div><div class="sd">1,519ms</div></div>
+<div class="sp p"><div class="sa">screenshot verify</div><div class="sd">40ms</div></div>
+<div class="sp p"><div class="sa">OpenBeak verify<div class="stht">"The title clearly states 'Pricing for teams shipping agent products.' I can confidently say the task is complete."</div></div><div class="sd">2,720ms</div></div></div>
+</div></div>
+
+<!-- T2 -->
+<div class="tc"><div class="th" onclick="t(this)"><h3>T2: Login → Sign Up</h3><span class="ar">▶</span></div>
+<div class="tb">
+<p style="color:var(--tm);margin-bottom:14px">Multi-step: homepage → login modal → sign up. Both pass.</p>
+<div class="as"><div class="al"><span class="d" style="background:var(--ab)"></span> agent-browser <span class="badge pass">PASS</span> — 8,412ms</div>
+<div class="sp p"><div class="sa">open + wait</div><div class="sd">3,488ms</div></div>
+<div class="sp p"><div class="sa">snapshot</div><div class="sd">478ms</div></div>
+<div class="sp p"><div class="sa">click @e9 (login)</div><div class="sd">2,722ms</div></div>
+<div class="sp p"><div class="sa">snapshot p2</div><div class="sd">426ms</div></div>
+<div class="sp p"><div class="sa">click @e3 (sign up)</div><div class="sd">865ms</div></div>
+<div class="sp p"><div class="sa">verify url</div><div class="sd">432ms</div></div></div>
+<div class="as"><div class="al"><span class="d" style="background:var(--bv)"></span> BeakVision + Playwright <span class="badge pass">PASS</span> — 14,190ms</div>
+<div class="sp p"><div class="sa">page.goto() + wait</div><div class="sd">1,594ms</div></div>
+<div class="sp p"><div class="sa">screenshot</div><div class="sd">67ms</div></div>
+<div class="sp p"><div class="sa">OpenBeak: find login<div class="stht">"I noticed a green button in the upper right corner that says 'login()'. I need to click this button to access the login screen."</div></div><div class="sd">2,553ms</div></div>
+<div class="sp p"><div class="sa">mouse.click(1115, 35) + wait</div><div class="sd">2,017ms</div></div>
+<div class="sp p"><div class="sa">screenshot p2</div><div class="sd">49ms</div></div>
+<div class="sp p"><div class="sa">OpenBeak: find sign up<div class="stht">"I noticed a 'Sign up' link at the bottom. It's purple and right next to 'Don't have an account?'"</div></div><div class="sd">2,957ms</div></div>
+<div class="sp p"><div class="sa">mouse.click(377, 326) + wait</div><div class="sd">1,008ms</div></div>
+<div class="sp p"><div class="sa">screenshot verify</div><div class="sd">23ms</div></div>
+<div class="sp p"><div class="sa">OpenBeak verify</div><div class="sd">2,829ms</div></div></div>
+</div></div>
+
+<!-- T3 -->
+<div class="tc"><div class="th" onclick="t(this)"><h3>T3: Playground Form Fill</h3><span class="ar">▶</span></div>
+<div class="tb">
+<p style="color:var(--tm);margin-bottom:14px">Custom React input defeats agent-browser's fill command. BV uses vision-click + keyboard.type().</p>
+<div class="as"><div class="al"><span class="d" style="background:var(--ab)"></span> agent-browser <span class="badge fail">FAIL</span> — 31,397ms</div>
+<div class="sp p"><div class="sa">open + wait</div><div class="sd">3,255ms</div></div>
+<div class="sp p"><div class="sa">snapshot</div><div class="sd">439ms</div></div>
+<div class="sp p"><div class="sa">click @e6 (Playground)</div><div class="sd">868ms</div></div>
+<div class="sp p"><div class="sa">snapshot playground</div><div class="sd">424ms</div></div>
+<div class="sp f"><div class="sa">fill @e18 — <strong>TIMEOUT</strong><div class="err">Custom React input rejected standard fill. Waited 25s before giving up.</div></div><div class="sd">25,407ms</div></div></div>
+<div class="as"><div class="al"><span class="d" style="background:var(--bv)"></span> BeakVision + Playwright <span class="badge pass">PASS</span> — 17,098ms</div>
+<div class="sp p"><div class="sa">page.goto() + wait</div><div class="sd">1,721ms</div></div>
+<div class="sp p"><div class="sa">screenshot</div><div class="sd">67ms</div></div>
+<div class="sp p"><div class="sa">OpenBeak: find playground<div class="stht">"'Playground' link in nav bar, right next to 'Pricing', text in white."</div></div><div class="sd">5,994ms</div></div>
+<div class="sp p"><div class="sa">mouse.click(848, 34) + wait</div><div class="sd">1,525ms</div></div>
+<div class="sp p"><div class="sa">screenshot p2</div><div class="sd">29ms</div></div>
+<div class="sp p"><div class="sa">OpenBeak: find input<div class="stht">"There is a 'Goal' input box. I need to click on it to activate it."</div></div><div class="sd">2,728ms</div></div>
+<div class="sp p"><div class="sa">mouse.click(191, 478) — vision coordinates</div><div class="sd">507ms</div></div>
+<div class="sp p"><div class="sa">keyboard.type() — bypasses framework input handling</div><div class="sd">1,024ms</div></div>
+<div class="sp p"><div class="sa">screenshot + verify</div><div class="sd">2,462ms</div></div></div>
+</div></div>
+
+<!-- T4 HARD -->
+<div class="tc" style="border-color:var(--or)"><div class="th" onclick="t(this)"><h3>T4: Select Pro Plan by Visual Context <span class="hard">HARD</span></h3><span class="ar">▶</span></div>
+<div class="tb">
+<p style="color:var(--tm);margin-bottom:14px"><strong>The killer test.</strong> Three pricing cards (Ultra, Pro, Metered) each have a <code>get_access()</code> button. In the DOM, all three are identical — <code>button "get_access()" [ref=e12/e13/e14]</code>. agent-browser has <em>zero</em> way to know which plan each button belongs to. BeakVision reads "$4.99/month" and "Pro" from the screenshot.</p>
+<div class="as"><div class="al"><span class="d" style="background:var(--ab)"></span> agent-browser <span class="badge fail">FAIL</span> — 4,455ms</div>
+<div class="sp p"><div class="sa">open /#pricing + wait</div><div class="sd">2,718ms</div></div>
+<div class="sp p"><div class="sa">snapshot — sees: get_access() [e12], get_access() [e13], get_access() [e14]</div><div class="sd">356ms</div></div>
+<div class="sp f"><div class="sa">Cannot identify Pro plan<div class="err">Snapshot shows 3 identical get_access() buttons with no plan labels. Non-interactive headings (Ultra, Pro, Metered) are invisible to snapshot.</div></div><div class="sd">0ms</div></div>
+<div class="sp p"><div class="sa">click @e13 (blind guess — hoping it's Pro)</div><div class="sd">375ms</div></div>
+<div class="sp f"><div class="sa">Cannot verify correct plan selected<div class="err">No visual context to confirm which plan was clicked. Even if the guess is right, there's no way to know.</div></div><div class="sd">0ms</div></div></div>
+<div class="as"><div class="al"><span class="d" style="background:var(--bv)"></span> BeakVision + Playwright <span class="badge pass">PASS</span> — 15,290ms</div>
+<div class="sp p"><div class="sa">page.goto() + wait</div><div class="sd">1,527ms</div></div>
+<div class="sp p"><div class="sa">screenshot</div><div class="sd">55ms</div></div>
+<div class="sp p"><div class="sa">OpenBeak: find pricing nav<div class="stht">"'Pricing' in nav bar, right next to 'FAQ'. Clicking to see pricing details."</div></div><div class="sd">3,238ms</div></div>
+<div class="sp p"><div class="sa">click pricing + scroll to cards</div><div class="sd">2,529ms</div></div>
+<div class="sp p"><div class="sa">screenshot pricing cards</div><div class="sd">41ms</div></div>
+<div class="sp p"><div class="sa">OpenBeak: identify Pro plan<div class="stht">"I noticed three 'get_access' buttons. The Pro plan costs $4.99/month, displayed in the middle. Its button is right below the Pro card with a green background."</div></div><div class="sd">3,236ms</div></div>
+<div class="sp p"><div class="sa">mouse.click(623, 455) — <strong>correct Pro plan button</strong></div><div class="sd">1,010ms</div></div>
+<div class="sp p"><div class="sa">screenshot + verify</div><div class="sd">3,166ms</div></div></div>
+</div></div>
+
+<!-- T5 HARD -->
+<div class="tc" style="border-color:var(--or)"><div class="th" onclick="t(this)"><h3>T5: Switch Mode + Fill + Visual Verify <span class="hard">HARD</span></h3><span class="ar">▶</span></div>
+<div class="tb">
+<p style="color:var(--tm);margin-bottom:14px"><strong>Triple challenge:</strong> (1) Switch from "Mobile Use" to "Grounding" mode tab, (2) verify the green badge changed from "Mobile Use" to "Grounding" (non-interactive visual label), (3) fill the custom input. agent-browser fails on both verification and fill.</p>
+<div class="as"><div class="al"><span class="d" style="background:var(--ab)"></span> agent-browser <span class="badge fail">FAIL</span> — 32,750ms</div>
+<div class="sp p"><div class="sa">open + wait</div><div class="sd">2,779ms</div></div>
+<div class="sp p"><div class="sa">snapshot</div><div class="sd">384ms</div></div>
+<div class="sp p"><div class="sa">click @e6 (Playground)</div><div class="sd">758ms</div></div>
+<div class="sp p"><div class="sa">snapshot playground</div><div class="sd">400ms</div></div>
+<div class="sp p"><div class="sa">click @e23 (Grounding tab) ✓</div><div class="sd">430ms</div></div>
+<div class="sp p"><div class="sa">snapshot after switch</div><div class="sd">400ms</div></div>
+<div class="sp f"><div class="sa">Verify mode label changed<div class="err">Cannot see visual mode label — the "Grounding" badge is a non-interactive element invisible to snapshot -i.</div></div><div class="sd">0ms</div></div>
+<div class="sp f"><div class="sa">fill @e18 — TIMEOUT<div class="err">Same custom input failure as T3.</div></div><div class="sd">25,407ms</div></div></div>
+<div class="as"><div class="al"><span class="d" style="background:var(--bv)"></span> BeakVision + Playwright <span class="badge pass">PASS</span> — 21,717ms</div>
+<div class="sp p"><div class="sa">page.goto() + wait</div><div class="sd">1,682ms</div></div>
+<div class="sp p"><div class="sa">screenshot</div><div class="sd">65ms</div></div>
+<div class="sp p"><div class="sa">OpenBeak: find playground<div class="stht">"'Playground' link in nav bar. White text, dark background."</div></div><div class="sd">2,961ms</div></div>
+<div class="sp p"><div class="sa">click playground + wait</div><div class="sd">1,516ms</div></div>
+<div class="sp p"><div class="sa">screenshot playground</div><div class="sd">46ms</div></div>
+<div class="sp p"><div class="sa">OpenBeak: find GROUNDING tab<div class="stht">"Three tabs in the middle. I need the one on the far right labeled 'GROUNDING', next to 'GUI VISION'. Gray background, white text."</div></div><div class="sd">3,281ms</div></div>
+<div class="sp p"><div class="sa">click GROUNDING tab</div><div class="sd">806ms</div></div>
+<div class="sp p"><div class="sa">screenshot after switch</div><div class="sd">46ms</div></div>
+<div class="sp p"><div class="sa">OpenBeak: verify mode<div class="stht">"The page has switched to Grounding mode. There is a <strong>green badge labeled 'Grounding'</strong> near the Goal input field. The mode switch was successful."</div></div><div class="sd">4,192ms</div></div>
+<div class="sp p"><div class="sa">OpenBeak: find input + click(coords)</div><div class="sd">2,877ms</div></div>
+<div class="sp p"><div class="sa">keyboard.type("the submit button")</div><div class="sd">367ms</div></div>
+<div class="sp p"><div class="sa">screenshot final</div><div class="sd">33ms</div></div>
+<div class="sp p"><div class="sa">OpenBeak: final verify<div class="stht">"Grounding mode is active and text has been entered in the Goal input."</div></div><div class="sd">2,344ms</div></div></div>
+</div></div>
+
+<!-- Insights -->
+<h2 class="sct">Key Insights</h2>
+<div class="ig">
+<div class="ic"><h4 style="color:var(--or)">The "Identical Buttons" Problem (T4)</h4><p>When multiple elements share the same label, DOM-based tools are <span class="hl">fundamentally blind</span>. You can pick by index, but you can't know what you're clicking. BeakVision reads the surrounding visual context — prices, plan names, card layouts — to make informed decisions. This is the core value proposition for AI agents on unknown sites.</p></div>
+<div class="ic"><h4 style="color:var(--bv)">Visual Verification is a Superpower (T5)</h4><p>agent-browser can click a tab but <span class="hl">cannot confirm the UI actually changed</span>. Snapshots only show interactive elements — not labels, badges, colors, or state indicators. BeakVision screenshots + analysis provides complete visual verification, essential for reliable multi-step automation.</p></div>
+<div class="ic"><h4 style="color:var(--ab)">agent-browser Wins on Speed</h4><p>For tasks where DOM refs suffice (T1, T2), agent-browser is <span class="hl">~2x faster</span>. No screenshot overhead, no API calls. When you know the site and elements are well-labeled, it's the pragmatic choice.</p></div>
+<div class="ic"><h4 style="color:var(--pu)">keyboard.type() &gt; fill()</h4><p>The consistent T3/T5 fill failure reveals a real-world problem: modern React/Vue components often intercept input events. <span class="hl">Vision-guided click + keyboard.type()</span> bypasses framework abstractions entirely — the browser just sends keystrokes to whatever has focus.</p></div>
+<div class="ic"><h4 style="color:var(--cy)">&lt;$0.01 for Full Visual Understanding</h4><p>16 API calls, 25,941 tokens, under a penny. At ~1,600 tokens and ~3.3s per call, BeakVision adds <span class="hl">modest overhead for dramatic capability gains</span>. The cost-effectiveness makes it viable for production AI agents, not just demos.</p></div>
+<div class="ic"><h4 style="color:var(--tm)">The Best Approach Depends on the Task</h4><p><strong>Simple nav on known sites?</strong> agent-browser. <strong>Complex flows on unknown sites?</strong> BeakVision + Playwright. <strong>The hardest tasks — visual disambiguation, state verification, custom inputs — are only possible with vision.</strong></p></div>
+</div>
+
+<div style="text-align:center;margin:50px 0 16px;color:var(--tm);font-size:.82rem">
+BeakVision Browser Automation Benchmark &middot; March 2026<br>
+<span style="opacity:.5">OpenBeak UI-TARS 1.5 &middot; Chromium headless &middot; localhost:8787</span>
+</div>
+</div>
+<script>function t(h){h.classList.toggle('op');h.nextElementSibling.classList.toggle('op')}
+document.querySelectorAll('.th').forEach(h=>h.click())</script>
+</body>
+</html>
